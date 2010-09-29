@@ -1,0 +1,8 @@
+{application, sirenad, [
+    {description,  "sirena.d sirena-to-ruby adapter"},
+    {vsn,          "0.0.1"},
+    {modules,      []}, % automatically filled by rebar.
+    {registered,   [sirenad_sup]},
+    {applications, [kernel, stdlib, sasl]},
+    {mod,          {sirenad_app, []}}
+]}.
