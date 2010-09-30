@@ -50,3 +50,33 @@ decode_incomplete2_test() ->
 decode_error_test() ->
     % invalid header.
     ?assertEqual(error, srn_msg:decode(<<1:32, 1:32, 1:32, 1, 0:1024>>)).
+
+
+is_zipped_test() ->
+    ?assertEqual(false,
+        srn_msg:is_zipped(?MSG#srn_msg{hdr = #srn_hdr{flags = 0}})),
+    ?assertEqual(true,
+        srn_msg:is_zipped(?MSG#srn_msg{hdr = #srn_hdr{flags = 16#04}})).
+
+
+is_sym_encrypted_test() ->
+    ?assertEqual(false,
+        srn_msg:is_sym_encrypted(?MSG#srn_msg{hdr = #srn_hdr{flags = 0}})),
+    ?assertEqual(true,
+        srn_msg:is_sym_encrypted(?MSG#srn_msg{hdr = #srn_hdr{flags = 16#08}})).
+
+
+is_pub_encrypted_test() ->
+    ?assertEqual(false,
+        srn_msg:is_pub_encrypted(?MSG#srn_msg{hdr = #srn_hdr{flags = 0}})),
+    ?assertEqual(true,
+        srn_msg:is_pub_encrypted(?MSG#srn_msg{hdr = #srn_hdr{flags = 16#40}})).
+
+
+flags_test() ->
+    ?assertEqual(0, srn_msg:flags([])),
+    ?assertEqual(16#08, srn_msg:flags([sym_encrypted])),
+    ?assertEqual(16#10, srn_msg:flags([zip_response])),
+    ?assertEqual(16#14, srn_msg:flags([msg_zipped, zip_response])),
+    ?assertEqual(16#50, srn_msg:flags([zip_response, pub_encrypted])),
+    ?assertEqual(16#54, srn_msg:flags([msg_zipped, zip_response, pub_encrypted])).
