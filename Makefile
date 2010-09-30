@@ -30,8 +30,7 @@ rel: compile
 relclean:
 	@rm -rf rel/sirenad
 
-clobber: relclean
-	@./rebar skip_deps=true clean
+clobber: relclean clean
 
 getdeps:
 	@./rebar skip_deps=true get-deps
