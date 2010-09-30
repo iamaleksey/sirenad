@@ -1,5 +1,5 @@
 {application, sirenad, [
-    {description,  "sirena.d sirena-to-ruby adapter"},
+    {description,  "sirena protocol to http adapter"},
     {vsn,          "0.0.1"},
     {modules,      []}, % automatically filled by rebar.
     {registered,   [sirenad_sup]},
