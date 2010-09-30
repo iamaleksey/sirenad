@@ -45,3 +45,8 @@ decode_incomplete1_test() ->
 decode_incomplete2_test() ->
     % complete header + incomplete body.
     ?assertEqual(incomplete, srn_msg:decode(binary:part(?BIN, {0, 100 + 16}))).
+
+
+decode_error_test() ->
+    % invalid header.
+    ?assertEqual(error, srn_msg:decode(<<1:32, 1:32, 1:32, 1, 0:1024>>)).
