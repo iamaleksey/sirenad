@@ -34,8 +34,9 @@ encode(Msg) ->
         },
         body = Body
     } = Msg,
+    StatusB = case Status of ok -> 0; error -> 1 end,
     Len = size(Body),
-    <<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, Status:8,
+    <<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, StatusB:8,
         KeyId:32, 0:384, Body/binary>>.
 
 
@@ -44,7 +45,7 @@ encode(Msg) ->
 decode(Buffer) when size(Buffer) < 100 ->
     incomplete;
 
-decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, Status:8,
+decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, StatusB:8,
          KeyId:32, 0:384, Rest/binary>>) ->
     if
         size(Rest) < Len ->
@@ -56,7 +57,7 @@ decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, Status:8,
                     hdr = #srn_hdr{
                         id        = Id,
                         timestamp = Timestamp,
-                        status    = Status,
+                        status    = case StatusB of 0 -> ok; 1 -> error end,
                         client_id = ClientId,
                         key_id    = KeyId,
                         flags     = Flags
