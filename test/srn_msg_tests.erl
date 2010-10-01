@@ -60,6 +60,40 @@ decode_error_test() ->
     ?assertEqual(error, srn_msg:decode(<<1:32, 1:32, 1:32, 1, 0:1024>>)).
 
 
+zip_test() ->
+    ?assertNot(srn_msg:is_zipped(?MSG1)),
+    ?assert(size(?MSG1#srn_msg.body) > size(zlib:zip(?MSG1#srn_msg.body))),
+    Msg = srn_msg:zip(?MSG1),
+    ?assert(srn_msg:is_zipped(Msg)),
+    ?assert(size(?MSG1#srn_msg.body) > size(Msg#srn_msg.body)).
+
+
+zip_unneeded_test() ->
+    ?assertNot(srn_msg:is_zipped(?MSG1)),
+    Msg = srn_msg:zip(?MSG1),
+    ?assert(srn_msg:is_zipped(Msg)),
+    ?assertEqual(Msg, srn_msg:zip(Msg)).
+
+
+zip_useless_test() ->
+    ?assertNot(srn_msg:is_zipped(?MSG1)),
+    Msg = ?MSG1#srn_msg{body = <<0,1,2,3>>},
+    ?assert(size(Msg#srn_msg.body) =< size(zlib:zip(Msg#srn_msg.body))),
+    ?assertEqual(Msg, srn_msg:zip(Msg)).
+
+
+unzip_test() ->
+    ?assertNot(srn_msg:is_zipped(?MSG1)),
+    Msg = srn_msg:zip(?MSG1),
+    ?assert(srn_msg:is_zipped(Msg)),
+    ?assertEqual(?MSG1, srn_msg:unzip(Msg)).
+
+
+unzip_unneeded_test() ->
+    ?assertNot(srn_msg:is_zipped(?MSG1)),
+    ?assertEqual(?MSG1, srn_msg:unzip(?MSG1)).
+
+
 is_zipped_test() ->
     ?assertEqual(false,
         srn_msg:is_zipped(?MSG1#srn_msg{hdr = #srn_hdr{flags = 0}})),

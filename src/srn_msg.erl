@@ -5,6 +5,7 @@
 
 
 -export([encode/1, decode/1]).
+-export([zip/1, unzip/1]).
 -export([is_zipped/1, is_sym_encrypted/1, is_pub_encrypted/1, flags/1]).
 
 
@@ -16,7 +17,7 @@
 
 
 %% -------------------------------------------------------------------------
-%% API
+%% encode/decode
 %% -------------------------------------------------------------------------
 
 
@@ -73,7 +74,49 @@ decode(_) ->
 
 
 %% -------------------------------------------------------------------------
-%% Flag helpers
+%% zip/unzip
+%% -------------------------------------------------------------------------
+
+
+-spec zip/1 :: (srn_msg()) -> srn_msg().
+
+zip(#srn_msg{hdr = #srn_hdr{flags = Flags} = Hdr, body = Body} = Msg) ->
+    case is_zipped(Msg) of
+        true ->
+            % already zipped somehow.
+            Msg;
+        false ->
+            Zipped = zlib:zip(Body),
+            if
+                size(Zipped) >= size(Body) ->
+                    % zipping proved to be useless - don't replace body.
+                    Msg;
+                true ->
+                    Msg#srn_msg{
+                        hdr  = Hdr#srn_hdr{flags = Flags bor ?MSG_ZIPPED},
+                        body = Zipped
+                    }
+            end
+    end.
+
+
+-spec unzip/1 :: (srn_msg()) -> srn_msg().
+
+unzip(#srn_msg{hdr = #srn_hdr{flags = Flags} = Hdr, body = Body} = Msg) ->
+    case is_zipped(Msg) of
+        true ->
+            Msg#srn_msg{
+                hdr  = Hdr#srn_hdr{flags = Flags band (?MSG_ZIPPED bxor 255)},
+                body = zlib:unzip(Body)
+            };
+        false ->
+            % not zipped.
+            Msg
+    end.
+
+
+%% -------------------------------------------------------------------------
+%% flag helpers
 %% -------------------------------------------------------------------------
 
 
