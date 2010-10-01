@@ -1,6 +1,9 @@
 all: compile
 
 compile:
+	@./rebar skip_deps=true compile
+
+compileall:
 	@./rebar compile
 
 clean:
@@ -24,7 +27,7 @@ buildplt:
 xref:
 	@./rebar skip_deps=true xref
 
-rel: compile
+rel: compileall
 	@cd rel; ../rebar generate
 
 relclean:
@@ -38,4 +41,4 @@ getdeps:
 deldeps:
 	@./rebar skip_deps=true delete-deps
 
-.PHONY: all compile clean console test analyze checkplt buildplt xref rel relclean getdeps deldeps
+.PHONY: all compile compileall clean console test analyze checkplt buildplt xref rel relclean getdeps deldeps
