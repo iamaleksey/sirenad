@@ -4,9 +4,14 @@
 -include("srn_msg.hrl").
 
 
+-ifdef(TEST).
+-compile(export_all).
+-endif.
+
+
 -export([encode/1, decode/1]).
 -export([zip/1, unzip/1]).
--export([is_zipped/1, is_sym_encrypted/1, is_pub_encrypted/1, flags/1]).
+-export([has_opt/2]).
 
 
 %% flags:
@@ -14,6 +19,14 @@
 -define(ZIP_RESPONSE,  16#10).
 -define(SYM_ENCRYPTED, 16#08).
 -define(PUB_ENCRYPTED, 16#40).
+
+%% mask-to-opt mapping:
+-define(OPTS, [
+    {?MSG_ZIPPED,    msg_zipped},
+    {?ZIP_RESPONSE,  zip_response},
+    {?SYM_ENCRYPTED, sym_encrypted},
+    {?PUB_ENCRYPTED, pub_encrypted}
+]).
 
 
 %% -------------------------------------------------------------------------
@@ -31,13 +44,14 @@ encode(Msg) ->
             status    = Status,
             client_id = ClientId,
             key_id    = KeyId,
-            flags     = Flags
+            opts      = Opts
         },
         body = Body
     } = Msg,
     StatusB = case Status of ok -> 0; error -> 1 end,
+    Mask = combine_opts(Opts),
     Len = size(Body),
-    <<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, StatusB:8,
+    <<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Mask:8, StatusB:8,
         KeyId:32, 0:384, Body/binary>>.
 
 
@@ -46,7 +60,7 @@ encode(Msg) ->
 decode(Buffer) when size(Buffer) < 100 ->
     incomplete;
 
-decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, StatusB:8,
+decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Mask:8, StatusB:8,
          KeyId:32, 0:384, Rest/binary>>) ->
     if
         size(Rest) < Len ->
@@ -61,7 +75,7 @@ decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Flags:8, StatusB:8,
                         status    = case StatusB of 0 -> ok; 1 -> error end,
                         client_id = ClientId,
                         key_id    = KeyId,
-                        flags     = Flags
+                        opts      = extract_opts(Mask)
                     },
                     body = Body
                 },
@@ -80,73 +94,78 @@ decode(_) ->
 
 -spec zip/1 :: (srn_msg()) -> srn_msg().
 
-zip(#srn_msg{hdr = #srn_hdr{flags = Flags} = Hdr, body = Body} = Msg) ->
-    case is_zipped(Msg) of
+zip(#srn_msg{body = Body} = Msg) ->
+    case has_opt(Msg, msg_zipped) of
         true ->
-            % already zipped somehow.
-            Msg;
+            Msg; % already zipped somehow.
         false ->
             Zipped = zlib:zip(Body),
             if
                 size(Zipped) >= size(Body) ->
-                    % zipping proved to be useless - don't replace body.
-                    Msg;
+                    Msg; % zipping proved to be useless - don't replace body.
                 true ->
-                    Msg#srn_msg{
-                        hdr  = Hdr#srn_hdr{flags = Flags bor ?MSG_ZIPPED},
-                        body = Zipped
-                    }
+                    set_opt(Msg#srn_msg{body = Zipped}, msg_zipped)
             end
     end.
 
 
 -spec unzip/1 :: (srn_msg()) -> srn_msg().
 
-unzip(#srn_msg{hdr = #srn_hdr{flags = Flags} = Hdr, body = Body} = Msg) ->
-    case is_zipped(Msg) of
+unzip(#srn_msg{body = Body} = Msg) ->
+    case has_opt(Msg, msg_zipped) of
         true ->
-            Msg#srn_msg{
-                hdr  = Hdr#srn_hdr{flags = Flags band (?MSG_ZIPPED bxor 255)},
-                body = zlib:unzip(Body)
-            };
+            unset_opt(Msg#srn_msg{body = zlib:unzip(Body)}, msg_zipped);
         false ->
-            % not zipped.
-            Msg
+            Msg % not zipped.
     end.
 
 
 %% -------------------------------------------------------------------------
-%% flag helpers
+%% opt helpers
 %% -------------------------------------------------------------------------
 
 
--spec is_zipped/1 :: (srn_msg()) -> boolean().
+-spec has_opt/2 :: (srn_msg(), srn_opt()) -> boolean().
 
-is_zipped(Msg) ->
-    Msg#srn_msg.hdr#srn_hdr.flags band ?MSG_ZIPPED =:= ?MSG_ZIPPED.
-
-
--spec is_sym_encrypted/1 :: (srn_msg()) -> boolean().
-
-is_sym_encrypted(Msg) ->
-    Msg#srn_msg.hdr#srn_hdr.flags band ?SYM_ENCRYPTED =:= ?SYM_ENCRYPTED.
+has_opt(#srn_msg{hdr = Hdr}, Opt) ->
+    lists:any(fun(O) -> O =:= Opt end, Hdr#srn_hdr.opts).
 
 
--spec is_pub_encrypted/1 :: (srn_msg()) -> boolean().
+%% -------------------------------------------------------------------------
+%% private functions
+%% -------------------------------------------------------------------------
 
-is_pub_encrypted(Msg) ->
-    Msg#srn_msg.hdr#srn_hdr.flags band ?PUB_ENCRYPTED =:= ?PUB_ENCRYPTED.
+
+-spec set_opt/2 :: (srn_msg(), srn_opt()) -> srn_msg().
+
+set_opt(#srn_msg{hdr = #srn_hdr{opts = Opts} = Hdr} = Msg, Opt) ->
+    Msg#srn_msg{hdr = Hdr#srn_hdr{opts = lists:usort([Opt|Opts])}}.
 
 
--spec flags/1 ::
-    (['msg_zipped' | 'zip_response' | 'sym_encrypted' | 'pub_encrypted']) ->
-        non_neg_integer().
+-spec unset_opt/2 :: (srn_msg(), srn_opt()) -> srn_msg().
 
-flags(Aliases) ->
+unset_opt(#srn_msg{hdr = #srn_hdr{opts = Opts} = Hdr} = Msg, Opt) ->
+    Msg#srn_msg{hdr = Hdr#srn_hdr{opts = lists:delete(Opt, lists:usort(Opts))}}.
+
+
+-spec combine_opts/1 :: ([srn_opt()]) -> non_neg_integer().
+
+combine_opts(Opts) ->
     lists:foldl(
-        fun(msg_zipped,    Mask) -> Mask bor ?MSG_ZIPPED;
-           (zip_response,  Mask) -> Mask bor ?ZIP_RESPONSE;
-           (sym_encrypted, Mask) -> Mask bor ?SYM_ENCRYPTED;
-           (pub_encrypted, Mask) -> Mask bor ?PUB_ENCRYPTED
-        end, 0, Aliases
+        fun(Opt, Mask) ->
+                Mask bor element(1, lists:keyfind(Opt, 2, ?OPTS))
+        end, 0, Opts
+    ).
+
+
+-spec extract_opts/1 :: (non_neg_integer()) -> [srn_opt()].
+
+extract_opts(Mask) ->
+    lists:foldl(
+        fun({Flag, Opt}, Opts) ->
+                case Mask band Flag =:= Flag of
+                    true  -> [Opt|Opts];
+                    false -> Opts
+                end
+        end, [], ?OPTS
     ).
