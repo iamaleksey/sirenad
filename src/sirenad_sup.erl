@@ -34,5 +34,6 @@ start_link() ->
 
 init([]) ->
     ChildSpecs = [
+        ?GEN_CHILD_SPEC(srn_client, permanent, 5000)
     ],
-    {ok, {{rest_for_one, 5, 30}, ChildSpecs}}.
+    {ok, {{one_for_one, 5, 30}, ChildSpecs}}.

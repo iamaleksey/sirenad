@@ -2,7 +2,7 @@
     {description,  "sirena protocol to http adapter"},
     {vsn,          "0.0.1"},
     {modules,      []}, % automatically filled by rebar.
-    {registered,   [sirenad_sup]},
+    {registered,   [sirenad_sup, srn_client]},
     {applications, [kernel, stdlib, sasl, mochiweb]},
     {mod,          {sirenad_app, []}}
 ]}.
