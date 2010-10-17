@@ -34,6 +34,7 @@ start_link() ->
 
 init([]) ->
     ChildSpecs = [
-        ?GEN_CHILD_SPEC(srn_client, permanent, 5000)
+        ?GEN_CHILD_SPEC(srn_client, permanent, 5000),
+        ?GEN_CHILD_SPEC(srn_http,   permanent, 5000)
     ],
     {ok, {{one_for_one, 5, 30}, ChildSpecs}}.
