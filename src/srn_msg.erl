@@ -55,7 +55,7 @@ encode(Msg) ->
         KeyId:32, 0:384, Body/binary>>.
 
 
--spec decode/1 :: (binary()) -> {srn_msg(), binary()} | 'incomplete' | 'error'.
+-spec decode/1 :: (binary()) -> {srn_msg(), binary()} | 'incomplete'.
 
 decode(Buffer) when size(Buffer) < 100 ->
     incomplete;
@@ -81,10 +81,7 @@ decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Mask:8, StatusB:8,
                 },
                 Next
             }
-    end;
-
-decode(_) ->
-    error.
+    end.
 
 
 %% -------------------------------------------------------------------------

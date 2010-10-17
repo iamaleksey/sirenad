@@ -55,11 +55,6 @@ decode_incomplete2_test() ->
     ?assertEqual(incomplete, srn_msg:decode(binary:part(?BIN1, {0, 100 + 16}))).
 
 
-decode_error_test() ->
-    % invalid header.
-    ?assertEqual(error, srn_msg:decode(<<1:32, 1:32, 1:32, 1, 0:1024>>)).
-
-
 zip_test() ->
     ?assertNot(srn_msg:has_opt(?MSG1, msg_zipped)),
     ?assert(size(?MSG1#srn_msg.body) > size(zlib:zip(?MSG1#srn_msg.body))),
