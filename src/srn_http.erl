@@ -57,7 +57,7 @@ handle_request(Req, Body, Timeout, Priority) ->
         try list_to_integer(Timeout) of
             Secs -> Secs
         catch
-            _:_ -> sirenad_app:get_env(sirena_timeout)
+            _:_ -> sirenad_app:get_env(request_timeout)
         end,
     P =
         try list_to_integer(Priority) of

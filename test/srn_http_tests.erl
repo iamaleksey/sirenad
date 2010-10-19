@@ -5,10 +5,10 @@
 
 
 -define(HTTP_PORT, 8889).
--define(SIRENA_TIMEOUT, 10).
+-define(REQUEST_TIMEOUT, 10).
 -define(ENV, [
-    {http_port,      ?HTTP_PORT},
-    {sirena_timeout, ?SIRENA_TIMEOUT}
+    {http_port,       ?HTTP_PORT},
+    {request_timeout, ?REQUEST_TIMEOUT}
 ]).
 -define(QUERY,  <<"<sirena><query></query></sirena>">>).
 -define(ANSWER, <<"<sirena><answer></answer></sirena>">>).
@@ -54,7 +54,7 @@ test_403(_Mock) ->
 
 test_503(Mock) ->
     gen_server_mock:expect_call(Mock,
-        fun({request, ?QUERY, ?SIRENA_TIMEOUT * 1000, 0}, _From, St) ->
+        fun({request, ?QUERY, ?REQUEST_TIMEOUT * 1000, 0}, _From, St) ->
                 {ok, {error, overloaded}, St}
         end
     ),
@@ -64,7 +64,7 @@ test_503(Mock) ->
 
 test_504(Mock) ->
     gen_server_mock:expect_call(Mock,
-        fun({request, ?QUERY, ?SIRENA_TIMEOUT * 1000, 0}, _From, St) ->
+        fun({request, ?QUERY, ?REQUEST_TIMEOUT * 1000, 0}, _From, St) ->
                 {ok, {error, timeout}, St}
         end
     ),
@@ -79,7 +79,7 @@ test_500(Mock) ->
 
 test_200_no_headers(Mock) ->
     gen_server_mock:expect_call(Mock,
-        fun({request, ?QUERY, ?SIRENA_TIMEOUT * 1000, 0}, _From, St) ->
+        fun({request, ?QUERY, ?REQUEST_TIMEOUT * 1000, 0}, _From, St) ->
                 {ok, {ok, ?ANSWER}, St}
         end
     ),
