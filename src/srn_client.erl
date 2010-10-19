@@ -16,7 +16,8 @@
          handle_call/3,
          handle_cast/2,
          handle_info/2,
-         code_change/3]).
+         code_change/3,
+         format_status/2]).
 
 
 -record(st, {session     :: pid(),
@@ -139,3 +140,15 @@ handle_info(Info, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+format_status(normal, [_PDict, St]) ->
+    [{data, [{"State", St}]}];
+format_status(terminate, [_PDict, St]) ->
+    [
+        {state, St#st{requests = undefined, queue = undefined}},
+        {stats, [
+            {reqs_size, dict:size(St#st.requests)},
+            {queue_len, pqueue:len(St#st.queue)}
+        ]}
+    ].
