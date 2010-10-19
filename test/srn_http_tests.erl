@@ -28,6 +28,10 @@ srn_http_test_() ->
         end,
 
         fun(Mock) ->
+                case is_process_alive(Mock) of
+                    true  -> unregister(srn_client);
+                    false -> ignore
+                end,
                 srn_http:stop(),
                 gen_server_mock:stop(Mock)
         end,
@@ -35,6 +39,7 @@ srn_http_test_() ->
         [
             {with, [fun test_405/1]},
             {with, [fun test_403/1]},
+            {with, [fun test_502/1]},
             {with, [fun test_503/1]},
             {with, [fun test_504/1]},
             {with, [fun test_500/1]},
@@ -50,6 +55,16 @@ test_405(_Mock) ->
 
 test_403(_Mock) ->
     ?assertMatch({ok, {{_, 403, _}, _, _}}, post("/wrong", [], ?QUERY)).
+
+
+test_502(Mock) ->
+    gen_server_mock:expect_call(Mock,
+        fun({request, ?QUERY, ?REQUEST_TIMEOUT * 1000, 0}, _From, St) ->
+                {ok, {error, failed}, St}
+        end
+    ),
+    ?assertMatch({ok, {{_, 502, _}, _, _}}, post("/", [], ?QUERY)),
+    gen_server_mock:assert_expectations(Mock).
 
 
 test_503(Mock) ->

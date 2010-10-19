@@ -20,11 +20,18 @@
          format_status/2]).
 
 
--record(st, {session     :: pid(),
-             window_size :: pos_integer(),
-             queue_len   :: non_neg_integer(),
-             requests    :: dict(),
-             queue       :: pqueue:pqueue()}).
+-record(req, {from        :: {pid(), reference()},
+              body        :: binary(),
+              timeout     :: non_neg_integer(),
+              retries = 0 :: non_neg_integer()}).
+
+
+-record(st,  {session     :: pid(),
+              window_size :: pos_integer(),
+              queue_len   :: non_neg_integer(),
+              retry_times :: non_neg_integer(),
+              requests    :: dict(),
+              queue       :: pqueue:pqueue()}).
 
 
 %% -------------------------------------------------------------------------
@@ -45,7 +52,7 @@ stop() ->
 
 
 -spec request/3 :: (binary(), pos_integer(), non_neg_integer()) ->
-        {'ok', binary()} | {'error', 'timeout' | 'overloaded'}.
+        {'ok', binary()} | {'error', 'failed' | 'timeout' | 'overloaded'}.
 
 request(Body, Timeout, Prio) ->
     gen_server:call(?MODULE, {request, Body, Timeout, Prio}, infinity).
@@ -70,6 +77,7 @@ init([]) ->
                 session     = Session,
                 window_size = sirenad_app:get_env(window_size, 1),
                 queue_len   = sirenad_app:get_env(queue_len, 0),
+                retry_times = sirenad_app:get_env(retry_times, 0),
                 requests    = dict:new(),
                 queue       = pqueue:new()
             }};
@@ -83,18 +91,14 @@ terminate(_Reason, St) ->
 
 
 handle_call({request, Body, Timeout, Prio}, From, St) ->
+    Req = #req{from = From, body = Body, timeout = Timeout},
     case dict:size(St#st.requests) < St#st.window_size of
         true ->
-            Ref = srn_session:request(St#st.session, Body, Timeout),
-            {noreply, St#st{
-                requests = dict:store(Ref, From, St#st.requests)
-            }};
+            make_request(Req, false, St);
         false ->
             case pqueue:len(St#st.queue) < St#st.queue_len of
                 true ->
-                    {noreply, St#st{
-                        queue = pqueue:in({From, Body, Timeout}, Prio, St#st.queue)
-                    }};
+                    {noreply, St#st{queue = pqueue:in(Req, Prio, St#st.queue)}};
                 false ->
                     {reply, {error, overloaded}, St}
             end
@@ -105,20 +109,25 @@ handle_call(Request, _From, St) ->
     {stop, {unexpected_call, Request}, St}.
 
 
-handle_cast({response, Ref, Resp}, St) ->
-    From = dict:fetch(Ref, St#st.requests),
-    gen_server:reply(From, Resp),
-    Dict = dict:erase(Ref, St#st.requests),
-    case pqueue:out(St#st.queue) of
-        {{value, {From2, Body, Timeout}}, Queue} ->
-            Ref2 = srn_session:request(St#st.session, Body, Timeout),
-            {noreply, St#st{
-                requests = dict:store(Ref2, From2, Dict),
-                queue    = Queue
-            }};
-        {empty, _} ->
-            {noreply, St#st{requests = Dict}}
+%% Try to retry failed/timed out requests
+%% (unless retry_times limit has been exceeded).
+%% Here _Reason :: failed | timeout.
+handle_cast({response, Ref, {error, _Reason} = Resp}, St) ->
+    Req = dict:fetch(Ref, St#st.requests),
+    St_ = St#st{requests = dict:erase(Ref, St#st.requests)},
+    if
+        Req#req.retries < St#st.retry_times ->
+            make_request(Req, true, St_);
+        true ->
+            gen_server:reply(Req#req.from, Resp),
+            make_request_from_queue(St_)
     end;
+
+
+handle_cast({response, Ref, {ok, _Body} = Resp}, St) ->
+    Req = dict:fetch(Ref, St#st.requests),
+    gen_server:reply(Req#req.from, Resp),
+    make_request_from_queue(St#st{requests = dict:erase(Ref, St#st.requests)});
 
 
 handle_cast(stop, St) ->
@@ -152,3 +161,27 @@ format_status(terminate, [_PDict, St]) ->
             {queue_len, pqueue:len(St#st.queue)}
         ]}
     ].
+
+
+%% -------------------------------------------------------------------------
+%% private functions
+%% -------------------------------------------------------------------------
+
+
+make_request_from_queue(St) ->
+    case pqueue:out(St#st.queue) of
+        {{value, Req}, Queue} ->
+            make_request(Req, false, St#st{queue = Queue});
+        {empty, _} ->
+            {noreply, St}
+    end.
+
+
+make_request(Req, IsRetry, St) ->
+    Ref = srn_session:request(St#st.session, Req#req.body, Req#req.timeout),
+    Req_ =
+        if
+            IsRetry -> Req#req{retries = Req#req.retries + 1};
+            true    -> Req
+        end,
+    {noreply, St#st{requests = dict:store(Ref, Req_, St#st.requests)}}.

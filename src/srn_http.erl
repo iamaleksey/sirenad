@@ -68,6 +68,8 @@ handle_request(Req, Body, Timeout, Priority) ->
     try srn_client:request(Body, T * 1000, P) of
         {ok, RespBody} ->
             Req:ok({"application/xml", RespBody});
+        {error, failed} ->
+            Req:respond({502, [], <<"502 Bad Gateway">>});
         {error, overloaded} ->
             Req:respond({503, [], <<"503 Service Unavailable">>});
         {error, timeout} ->

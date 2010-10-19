@@ -111,11 +111,16 @@ handle_sync_event(Event, _From, _Stn, Std) ->
 
 
 handle_event({response, Msg}, Stn, Std) ->
-    #srn_msg{hdr = #srn_hdr{id = MsgId}, body = Body} = Msg,
+    #srn_msg{hdr = #srn_hdr{id = MsgId, status = Status}, body = Body} = Msg,
     case ets:lookup(Std#st.requests, MsgId) of
         [{MsgId, Ref, Timer}] ->
             erlang:cancel_timer(Timer),
-            gen_server:cast(Std#st.client, {response, Ref, {ok, Body}}),
+            Response =
+                case Status of
+                    ok    -> {ok, Body};
+                    error -> {error, failed}
+                end,
+            gen_server:cast(Std#st.client, {response, Ref, Response}),
             ets:delete(Std#st.requests, MsgId);
         [] ->
             ignore
@@ -125,10 +130,6 @@ handle_event({response, Msg}, Stn, Std) ->
 
 handle_event({sock_closed, Reason}, _Stn, Std) ->
     {stop, {sock_closed, Reason}, Std};
-
-
-handle_event({decode_error, Data}, _Stn, Std) ->
-    {stop, {decode_error, Data}, Std};
 
 
 handle_event(stop, _Stn, Std) ->
