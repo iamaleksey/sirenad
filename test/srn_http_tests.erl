@@ -70,7 +70,7 @@ test_502(Mock) ->
 test_503(Mock) ->
     gen_server_mock:expect_call(Mock,
         fun({request, ?QUERY, ?REQUEST_TIMEOUT * 1000, 0}, _From, St) ->
-                {ok, {error, overloaded}, St}
+                {ok, {error, unavailable}, St}
         end
     ),
     ?assertMatch({ok, {{_, 503, _}, _, _}}, post("/", [], ?QUERY)),

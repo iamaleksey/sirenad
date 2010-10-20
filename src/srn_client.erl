@@ -27,6 +27,8 @@
 
 
 -record(st,  {session     :: pid(),
+              is_stopping :: boolean(),
+              stop_from   :: {pid(), reference()},
               window_size :: pos_integer(),
               queue_len   :: non_neg_integer(),
               retry_times :: non_neg_integer(),
@@ -48,11 +50,11 @@ start_link() ->
 -spec stop/0 :: () -> no_return().
 
 stop() ->
-    gen_server:cast(?MODULE, stop).
+    gen_server:call(?MODULE, stop, infinity).
 
 
 -spec request/3 :: (binary(), pos_integer(), non_neg_integer()) ->
-        {'ok', binary()} | {'error', 'failed' | 'timeout' | 'overloaded'}.
+        {'ok', binary()} | {'error', 'failed' | 'timeout' | 'unavailable'}.
 
 request(Body, Timeout, Prio) ->
     gen_server:call(?MODULE, {request, Body, Timeout, Prio}, infinity).
@@ -75,6 +77,7 @@ init([]) ->
         {ok, Session} ->
             {ok, #st{
                 session     = Session,
+                is_stopping = false,
                 window_size = sirenad_app:get_env(window_size, 1),
                 queue_len   = sirenad_app:get_env(queue_len, 0),
                 retry_times = sirenad_app:get_env(retry_times, 0),
@@ -90,6 +93,10 @@ terminate(_Reason, St) ->
     srn_session:stop(St#st.session).
 
 
+handle_call({request, _, _, _}, _From, #st{is_stopping = true} = St) ->
+    {reply, {error, unavailable}, St};
+
+
 handle_call({request, Body, Timeout, Prio}, From, St) ->
     Req = #req{from = From, body = Body, timeout = Timeout},
     case dict:size(St#st.requests) < St#st.window_size of
@@ -100,8 +107,17 @@ handle_call({request, Body, Timeout, Prio}, From, St) ->
                 true ->
                     {noreply, St#st{queue = pqueue:in(Req, Prio, St#st.queue)}};
                 false ->
-                    {reply, {error, overloaded}, St}
+                    {reply, {error, unavailable}, St}
             end
+    end;
+
+
+handle_call(stop, From, St) ->
+    case dict:size(St#st.requests) of
+        0 ->
+            {stop, normal, ok, St};
+        _ ->
+            {noreply, St#st{is_stopping = true, stop_from = From}}
     end;
 
 
@@ -109,14 +125,25 @@ handle_call(Request, _From, St) ->
     {stop, {unexpected_call, Request}, St}.
 
 
+handle_cast({response, Ref, Resp}, #st{is_stopping = true} = St) ->
+    {Req, St_} = fetch_request_by_ref(Ref, St),
+    gen_server:reply(Req#req.from, Resp),
+    case dict:size(St_#st.requests) of
+        0 ->
+            gen_server:reply(St_#st.stop_from, ok),
+            {stop, normal, St_};
+        _ ->
+            {noreply, St_}
+    end;
+
+
 %% Try to retry failed/timed out requests
 %% (unless retry_times limit has been exceeded).
 %% Here _Reason :: failed | timeout.
 handle_cast({response, Ref, {error, _Reason} = Resp}, St) ->
-    Req = dict:fetch(Ref, St#st.requests),
-    St_ = St#st{requests = dict:erase(Ref, St#st.requests)},
+    {Req, St_} = fetch_request_by_ref(Ref, St),
     if
-        Req#req.retries < St#st.retry_times ->
+        Req#req.retries < St_#st.retry_times ->
             make_request(Req, true, St_);
         true ->
             gen_server:reply(Req#req.from, Resp),
@@ -125,14 +152,9 @@ handle_cast({response, Ref, {error, _Reason} = Resp}, St) ->
 
 
 handle_cast({response, Ref, {ok, _Body} = Resp}, St) ->
-    Req = dict:fetch(Ref, St#st.requests),
+    {Req, St_} = fetch_request_by_ref(Ref, St),
     gen_server:reply(Req#req.from, Resp),
-    make_request_from_queue(St#st{requests = dict:erase(Ref, St#st.requests)});
-
-
-handle_cast(stop, St) ->
-    srn_session:stop(St#st.session),
-    {stop, normal, St};
+    make_request_from_queue(St_);
 
 
 handle_cast(Request, St) ->
@@ -166,6 +188,12 @@ format_status(terminate, [_PDict, St]) ->
 %% -------------------------------------------------------------------------
 %% private functions
 %% -------------------------------------------------------------------------
+
+
+fetch_request_by_ref(Ref, St) ->
+    Req = dict:fetch(Ref, St#st.requests),
+    St_ = St#st{requests = dict:erase(Ref, St#st.requests)},
+    {Req, St_}.
 
 
 make_request_from_queue(St) ->

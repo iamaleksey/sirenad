@@ -70,7 +70,7 @@ handle_request(Req, Body, Timeout, Priority) ->
             Req:ok({"application/xml", RespBody});
         {error, failed} ->
             Req:respond({502, [], <<"502 Bad Gateway">>});
-        {error, overloaded} ->
+        {error, unavailable} ->
             Req:respond({503, [], <<"503 Service Unavailable">>});
         {error, timeout} ->
             Req:respond({504, [], <<"504 Gateway Timeout">>})

@@ -47,6 +47,8 @@ start(normal, _StartArgs) ->
 %% This function is called when ?APP application is about to be stopped,
 %% before shutting down the processes of the application.
 prep_stop(St) ->
+    srn_client:stop(),
+    srn_http:stop(),
     St.
 
 
