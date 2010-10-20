@@ -55,10 +55,14 @@ start_link(SessionMod) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, SessionMod, []).
 
 
--spec stop/0 :: () -> no_return().
+-spec stop/0 :: () -> 'ok'.
 
 stop() ->
-    gen_server:call(?MODULE, stop, infinity).
+    try gen_server:call(?MODULE, stop, infinity) of
+        ok -> ok
+    catch
+        exit:{noproc, _} -> ok
+    end.
 
 
 -spec request/3 :: (binary(), pos_integer(), non_neg_integer()) ->
