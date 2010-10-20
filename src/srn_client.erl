@@ -6,6 +6,7 @@
 
 %% API exports
 -export([start_link/0,
+         start_link/1,
          stop/0,
          request/3]).
 
@@ -27,6 +28,7 @@
 
 
 -record(st,  {session     :: pid(),
+              session_mod :: atom(),
               is_stopping :: boolean(),
               stop_from   :: {pid(), reference()},
               window_size :: pos_integer(),
@@ -44,7 +46,13 @@
 -spec start_link/0 :: () -> {'ok', pid()} | {'error', any()}.
 
 start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    start_link(srn_session).
+
+
+-spec start_link/1 :: (atom()) -> {'ok', pid()} | {'error', any()}.
+
+start_link(SessionMod) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, SessionMod, []).
 
 
 -spec stop/0 :: () -> no_return().
@@ -65,7 +73,7 @@ request(Body, Timeout, Prio) ->
 %% -------------------------------------------------------------------------
 
 
-init([]) ->
+init(SessionMod) ->
     process_flag(trap_exit, true),
     SessionArgs = [
         {addr,      sirenad_app:get_env(sirena_addr)},
@@ -73,10 +81,11 @@ init([]) ->
         {client,    self()},
         {client_id, sirenad_app:get_env(client_id)}
     ],
-    case srn_session:start_link(SessionArgs) of
+    case SessionMod:start_link(SessionArgs) of
         {ok, Session} ->
             {ok, #st{
                 session     = Session,
+                session_mod = SessionMod,
                 is_stopping = false,
                 window_size = sirenad_app:get_env(window_size, 1),
                 queue_len   = sirenad_app:get_env(queue_len, 0),
@@ -90,7 +99,7 @@ init([]) ->
 
 
 terminate(_Reason, St) ->
-    srn_session:stop(St#st.session).
+    (St#st.session_mod):stop(St#st.session).
 
 
 handle_call({request, _, _, _}, _From, #st{is_stopping = true} = St) ->
@@ -206,7 +215,7 @@ make_request_from_queue(St) ->
 
 
 make_request(Req, IsRetry, St) ->
-    Ref = srn_session:request(St#st.session, Req#req.body, Req#req.timeout),
+    Ref = (St#st.session_mod):request(St#st.session, Req#req.body, Req#req.timeout),
     Req_ =
         if
             IsRetry -> Req#req{retries = Req#req.retries + 1};
