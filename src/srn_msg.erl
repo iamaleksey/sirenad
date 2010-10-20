@@ -51,8 +51,8 @@ encode(Msg) ->
     StatusB = case Status of ok -> 0; error -> 1 end,
     Mask = combine_opts(Opts),
     Len = size(Body),
-    <<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Mask:8, StatusB:8,
-        KeyId:32, 0:384, Body/binary>>.
+    <<Len:32, Timestamp:32, Id:32, 0:32/unit:8, ClientId:16, Mask:8, StatusB:8,
+        KeyId:32, 0:48/unit:8, Body/binary>>.
 
 
 -spec decode/1 :: (binary()) -> {srn_msg(), binary()} | 'incomplete'.
@@ -60,8 +60,8 @@ encode(Msg) ->
 decode(Buffer) when size(Buffer) < 100 ->
     incomplete;
 
-decode(<<Len:32, Timestamp:32, Id:32, 0:256, ClientId:16, Mask:8, StatusB:8,
-         KeyId:32, 0:384, Rest/binary>>) ->
+decode(<<Len:32, Timestamp:32, Id:32, 0:32/unit:8, ClientId:16, Mask:8, StatusB:8,
+         KeyId:32, 0:48/unit:8, Rest/binary>>) ->
     if
         size(Rest) < Len ->
             incomplete;
