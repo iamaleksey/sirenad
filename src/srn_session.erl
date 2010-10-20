@@ -58,7 +58,7 @@ stop(Pid) ->
 
 
 -spec request/3 ::
-        (pid(), binary(), non_neg_integer() | 'infinity') -> reference().
+        (pid(), binary(), non_neg_integer()) -> reference().
 
 request(Pid, Body, Timeout) ->
     Event = {request, Body, Timeout},
