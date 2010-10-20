@@ -79,10 +79,15 @@ request(Body, Timeout, Prio) ->
 
 init(SessionMod) ->
     process_flag(trap_exit, true),
+    RespFun =
+        fun(Pid, Ref, Resp) ->
+                gen_server:cast(Pid, {response, Ref, Resp})
+        end,
     SessionArgs = [
         {addr,      sirenad_app:get_env(sirena_addr)},
         {port,      sirenad_app:get_env(sirena_port)},
         {client,    self()},
+        {resp_fun,  RespFun},
         {client_id, sirenad_app:get_env(client_id)}
     ],
     case SessionMod:start_link(SessionArgs) of

@@ -31,9 +31,14 @@
     if MsgId =:= ?MAX_MSG_ID -> 1; true -> MsgId + 1 end).
 
 
+-type response() :: {'ok', binary()} | {'error', 'timeout' | 'failed'}.
+-type resp_fun() :: fun((pid(), reference(), response()) -> any()).
+
+
 -record(st, {sock      :: port(),
              recv_loop :: pid(),
              client    :: pid(),
+             resp_fun  :: resp_fun(),
              msg_id    :: non_neg_integer(),
              client_id :: non_neg_integer(),
              key_id    :: non_neg_integer(),
@@ -81,6 +86,7 @@ init(Args) ->
                 sock      = Sock,
                 recv_loop = Loop,
                 client    = proplists:get_value(client, Args),
+                resp_fun  = proplists:get_value(resp_fun, Args),
                 msg_id    = 0,
                 client_id = proplists:get_value(client_id, Args),
                 key_id    = 0,
@@ -120,7 +126,7 @@ handle_event({response, Msg}, Stn, Std) ->
                     ok    -> {ok, Body};
                     error -> {error, failed}
                 end,
-            gen_server:cast(Std#st.client, {response, Ref, Response}),
+            (Std#st.resp_fun)(Std#st.client, Ref, Response),
             ets:delete(Std#st.requests, MsgId);
         [] ->
             ignore
@@ -144,7 +150,7 @@ handle_info({timeout, Timer, {response_timer, MsgId}}, Stn, Std) ->
     case ets:lookup(Std#st.requests, MsgId) of
         [{MsgId, Ref, Timer}] ->
             ets:delete(Std#st.requests, MsgId),
-            gen_server:cast(Std#st.client, {response, Ref, {error, timeout}});
+            (Std#st.resp_fun)(Std#st.client, Ref, {error, timeout});
         [] ->
             ignore
     end,
