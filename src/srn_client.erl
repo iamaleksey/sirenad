@@ -224,13 +224,13 @@ code_change(_OldVsn, St, _Extra) ->
 format_status(normal, [_PDict, St]) ->
     [{data, [{"State", St}]}];
 format_status(terminate, [_PDict, St]) ->
-    [
+    {
         {state, St#st{requests = undefined, queue = undefined}},
         {stats, [
             {reqs_size, dict:size(St#st.requests)},
             {queue_len, pqueue:len(St#st.queue)}
         ]}
-    ].
+    }.
 
 
 %% -------------------------------------------------------------------------
