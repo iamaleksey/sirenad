@@ -3,6 +3,6 @@
     {vsn,          "0.0.1"},
     {modules,      []}, % automatically filled by rebar.
     {registered,   [sirenad_sup, srn_client, srn_http]},
-    {applications, [kernel, stdlib, sasl, mochiweb]},
+    {applications, [kernel, stdlib, sasl, log4erl, mochiweb]},
     {mod,          {sirenad_app, []}}
 ]}.

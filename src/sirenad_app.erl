@@ -41,6 +41,7 @@ get_env(Key, Default) ->
 
 
 start(normal, _StartArgs) ->
+    ok = setup_logger(),
     sirenad_sup:start_link().
 
 
@@ -48,7 +49,6 @@ start(normal, _StartArgs) ->
 %% before shutting down the processes of the application.
 prep_stop(St) ->
     srn_client:stop(),
-    srn_http:stop(),
     St.
 
 
@@ -58,4 +58,28 @@ stop(_St) ->
 
 
 config_change(_Changed, _New, _Removed) ->
+    ok.
+
+
+%% -------------------------------------------------------------------------
+%% private functions
+%% -------------------------------------------------------------------------
+
+
+setup_logger() ->
+    FileAppenderSpec = {
+        get_env(file_log_dir, ""),               % log dir.
+        "sirenad",                               % log file name.
+        {size, get_env(file_log_size, 5000000)}, % individual log size in bytes.
+        get_env(file_log_rotations, 1),          % number of rotations.
+        "log",                                   % suffix.
+        get_env(file_log_level, none),           % minimum log level to log.
+        "%j %T [%L] %l%n"                        % format.
+    },
+    log4erl:add_file_appender(default_logger_file, FileAppenderSpec),
+    ConsoleAppenderSpec = {
+        get_env(console_log_level, none), % minimum log level to log.
+        "%j %T [%L] %l%n"                 % format.
+    },
+    log4erl:add_console_appender(default_logger_console, ConsoleAppenderSpec),
     ok.

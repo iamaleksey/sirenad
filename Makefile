@@ -27,13 +27,16 @@ buildplt:
 xref:
 	@./rebar skip_deps=true xref
 
-rel: compileall
+rel: checkdeps compileall
 	@cd rel; ../rebar generate
 
 relclean:
 	@rm -rf rel/sirenad
 
 clobber: relclean clean
+
+checkdeps:
+	@./rebar skip_deps=ture check-deps
 
 getdeps:
 	@./rebar skip_deps=true get-deps
