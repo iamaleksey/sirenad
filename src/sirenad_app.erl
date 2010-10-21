@@ -42,18 +42,22 @@ get_env(Key, Default) ->
 
 start(normal, _StartArgs) ->
     ok = setup_logger(),
+    log4erl:info("sirenad: starting up"),
     sirenad_sup:start_link().
 
 
 %% This function is called when ?APP application is about to be stopped,
 %% before shutting down the processes of the application.
 prep_stop(St) ->
+    log4erl:info("sirenad: stopping"),
     srn_client:stop(),
+    timer:sleep(200), % leave a little time for http responses.
     St.
 
 
 %% Perform necessary cleaning up *after* ?APP application has stopped.
 stop(_St) ->
+    log4erl:info("sirenad: stopped"),
     ok.
 
 

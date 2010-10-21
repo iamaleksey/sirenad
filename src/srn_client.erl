@@ -79,6 +79,7 @@ request(Body, Timeout, Prio) ->
 
 init(SessionMod) ->
     process_flag(trap_exit, true),
+    log4erl:info("client: initializing"),
     RespFun =
         fun(Pid, Ref, Resp) ->
                 gen_server:cast(Pid, {response, Ref, Resp})
@@ -107,11 +108,20 @@ init(SessionMod) ->
     end.
 
 
-terminate(_Reason, St) ->
-    (St#st.session_mod):stop(St#st.session).
+terminate(Reason, St) ->
+    (St#st.session_mod):stop(St#st.session),
+    case Reason of
+        normal ->
+            log4erl:info("client: terminated (normal)");
+        _ ->
+            log4erl:error("client: terminated (~P)", [Reason, 42])
+    end.
 
 
-handle_call({request, _, _, _}, _From, #st{is_stopping = true} = St) ->
+handle_call({request, Body, Timeout, Prio}, _From,
+        #st{is_stopping = true} = St) ->
+    log4erl:warn("client: discarded request [~P, ~w, ~w] (stopping)",
+        [Body, 42, Timeout div 1000, Prio]),
     {reply, {error, unavailable}, St};
 
 
@@ -119,18 +129,26 @@ handle_call({request, Body, Timeout, Prio}, From, St) ->
     Req = #req{from = From, body = Body, timeout = Timeout},
     case dict:size(St#st.requests) < St#st.window_size of
         true ->
+            log4erl:debug("client: got request [~P, ~w, ~w]",
+                [Body, 42, Timeout div 1000, Prio]),
             make_request(Req, false, St);
         false ->
             case pqueue:len(St#st.queue) < St#st.queue_len of
                 true ->
+                    log4erl:debug("client: got request [~P, ~w, ~w]",
+                        [Body, 42, Timeout div 1000, Prio]),
                     {noreply, St#st{queue = pqueue:in(Req, Prio, St#st.queue)}};
                 false ->
+                    log4erl:warn(
+                        "client: discarded request [~P, ~w, ~w] (queue filled)",
+                        [Body, 42, Timeout div 1000, Prio]),
                     {reply, {error, unavailable}, St}
             end
     end;
 
 
 handle_call(stop, From, St) ->
+    log4erl:info("client: stopping"),
     case dict:size(St#st.requests) of
         0 ->
             {stop, normal, ok, St};
@@ -144,6 +162,13 @@ handle_call(Request, _From, St) ->
 
 
 handle_cast({response, Ref, Resp}, #st{is_stopping = true} = St) ->
+    case Resp of
+        {ok, Body} ->
+            log4erl:debug("client: received ok response [~P]", [Body, 42]);
+        {error, Reason} ->
+            log4erl:error("client: received error response [~w] (final)",
+                [Reason])
+    end,
     {Req, St_} = fetch_request_by_ref(Ref, St),
     gen_server:reply(Req#req.from, Resp),
     case dict:size(St_#st.requests) of
@@ -158,18 +183,23 @@ handle_cast({response, Ref, Resp}, #st{is_stopping = true} = St) ->
 %% Try to retry failed/timed out requests
 %% (unless retry_times limit has been exceeded).
 %% Here _Reason :: failed | timeout.
-handle_cast({response, Ref, {error, _Reason} = Resp}, St) ->
+handle_cast({response, Ref, {error, Reason} = Resp}, St) ->
     {Req, St_} = fetch_request_by_ref(Ref, St),
     if
         Req#req.retries < St_#st.retry_times ->
+            log4erl:warn("client: received error response [~w] (will retry)",
+                [Reason]),
             make_request(Req, true, St_);
         true ->
+            log4erl:error("client: received error response [~w] (final)",
+                [Reason]),
             gen_server:reply(Req#req.from, Resp),
             make_request_from_queue(St_)
     end;
 
 
-handle_cast({response, Ref, {ok, _Body} = Resp}, St) ->
+handle_cast({response, Ref, {ok, Body} = Resp}, St) ->
+    log4erl:debug("client: received ok response [~P]", [Body, 42]),
     {Req, St_} = fetch_request_by_ref(Ref, St),
     gen_server:reply(Req#req.from, Resp),
     make_request_from_queue(St_);
