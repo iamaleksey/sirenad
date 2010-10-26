@@ -93,6 +93,7 @@ init(SessionMod) ->
     ],
     case SessionMod:start_link(SessionArgs) of
         {ok, Session} ->
+            log4erl:info("client: connected to sirena"),
             {ok, #st{
                 session     = Session,
                 session_mod = SessionMod,
@@ -104,6 +105,7 @@ init(SessionMod) ->
                 queue       = pqueue:new()
             }};
         {error, Reason} ->
+            log4erl:fatal("client: couldn't connect to sirena"),
             {stop, Reason}
     end.
 
