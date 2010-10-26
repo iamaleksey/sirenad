@@ -36,7 +36,7 @@ relclean:
 clobber: relclean clean
 
 checkdeps:
-	@./rebar skip_deps=ture check-deps
+	@./rebar skip_deps=true check-deps
 
 getdeps:
 	@./rebar skip_deps=true get-deps
