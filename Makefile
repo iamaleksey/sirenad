@@ -44,4 +44,4 @@ getdeps:
 deldeps:
 	@./rebar skip_deps=true delete-deps
 
-.PHONY: all compile compileall clean console test analyze checkplt buildplt xref rel relclean getdeps deldeps
+.PHONY: all compile compileall clean console test analyze checkplt buildplt xref rel relclean checkdeps getdeps deldeps
