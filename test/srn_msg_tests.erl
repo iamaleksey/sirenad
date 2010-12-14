@@ -5,6 +5,11 @@
 -include("srn_msg.hrl").
 
 
+-define(BODY,
+    <<"<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+       <sirena>
+       </sirena>">>).
+
 -define(MSG1,
     #srn_msg{
         hdr = #srn_hdr{
@@ -15,18 +20,18 @@
             key_id    = 4294967295,
             opts      = [zip_response]
         },
-        body = <<"<sirena></sirena>">>
+        body = ?BODY
     }).
 
 -define(MSG2, ?MSG1#srn_msg{hdr = ?MSG1#srn_msg.hdr#srn_hdr{status = error}}).
 
 -define(BIN1,
-    <<17:32, 4294967294:32, 4294967293:32, 0:32/unit:8, 65535:16, 16#10, 0,
-        4294967295:32, 0:48/unit:8, "<sirena></sirena>">>).
+    <<(size(?BODY)):32, 4294967294:32, 4294967293:32, 0:32/unit:8, 65535:16, 16#10, 0,
+        4294967295:32, 0:48/unit:8, ?BODY/binary>>).
 
 -define(BIN2,
-    <<17:32, 4294967294:32, 4294967293:32, 0:32/unit:8, 65535:16, 16#10, 1,
-        4294967295:32, 0:48/unit:8, "<sirena></sirena>">>).
+    <<(size(?BODY)):32, 4294967294:32, 4294967293:32, 0:32/unit:8, 65535:16, 16#10, 1,
+        4294967295:32, 0:48/unit:8, ?BODY/binary>>).
 
 
 encode_test() ->
@@ -57,7 +62,7 @@ decode_incomplete2_test() ->
 
 zip_test() ->
     ?assertNot(srn_msg:has_opt(?MSG1, msg_zipped)),
-    ?assert(size(?MSG1#srn_msg.body) > size(zlib:zip(?MSG1#srn_msg.body))),
+    ?assert(size(?MSG1#srn_msg.body) > size(zlib:compress(?MSG1#srn_msg.body))),
     Msg = srn_msg:zip(?MSG1),
     ?assert(srn_msg:has_opt(Msg, msg_zipped)),
     ?assert(size(?MSG1#srn_msg.body) > size(Msg#srn_msg.body)).
@@ -73,7 +78,7 @@ zip_unneeded_test() ->
 zip_useless_test() ->
     ?assertNot(srn_msg:has_opt(?MSG1, msg_zipped)),
     Msg = ?MSG1#srn_msg{body = <<0,1,2,3>>},
-    ?assert(size(Msg#srn_msg.body) =< size(zlib:zip(Msg#srn_msg.body))),
+    ?assert(size(Msg#srn_msg.body) =< size(zlib:compress(Msg#srn_msg.body))),
     ?assertEqual(Msg, srn_msg:zip(Msg)).
 
 

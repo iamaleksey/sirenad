@@ -96,7 +96,7 @@ zip(#srn_msg{body = Body} = Msg) ->
         true ->
             Msg; % already zipped somehow.
         false ->
-            Zipped = zlib:zip(Body),
+            Zipped = zlib:compress(Body),
             if
                 size(Zipped) >= size(Body) ->
                     Msg; % zipping proved to be useless - don't replace body.
@@ -111,7 +111,7 @@ zip(#srn_msg{body = Body} = Msg) ->
 unzip(#srn_msg{body = Body} = Msg) ->
     case has_opt(Msg, msg_zipped) of
         true ->
-            unset_opt(Msg#srn_msg{body = zlib:unzip(Body)}, msg_zipped);
+            unset_opt(Msg#srn_msg{body = zlib:uncompress(Body)}, msg_zipped);
         false ->
             Msg % not zipped.
     end.
