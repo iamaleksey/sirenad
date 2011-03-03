@@ -78,7 +78,7 @@ request(Pid, Body, Timeout) ->
 init(Args) ->
     Addr = proplists:get_value(addr, Args),
     Port = proplists:get_value(port, Args),
-    case gen_tcp:connect(Addr, Port, [binary]) of
+    case gen_tcp:connect(Addr, Port, [binary, {packet, 0}, {keepalive, true}]) of
         {ok, Sock} ->
             Loop = proc_lib:spawn_link(?MODULE, recv_loop, [self(), Sock, <<>>]),
             ok = gen_tcp:controlling_process(Sock, Loop),
