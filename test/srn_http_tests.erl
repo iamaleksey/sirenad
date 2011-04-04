@@ -7,6 +7,7 @@
 -define(LISTEN_PORT, 8889).
 -define(REQUEST_TIMEOUT, 10).
 -define(ENV, [
+    {listen_addr,     "127.0.0.1"},
     {listen_port,     ?LISTEN_PORT},
     {request_timeout, ?REQUEST_TIMEOUT}
 ]).
