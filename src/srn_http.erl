@@ -20,7 +20,7 @@
 start_link() ->
     mochiweb_http:start([
         {name, ?MODULE},
-        {port, sirenad_app:get_env(http_port)},
+        {port, sirenad_app:get_env(listen_port)},
         {loop, fun ?MODULE:handle_request/1}
     ]).
 

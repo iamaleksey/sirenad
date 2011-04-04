@@ -4,10 +4,10 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
--define(HTTP_PORT, 8889).
+-define(LISTEN_PORT, 8889).
 -define(REQUEST_TIMEOUT, 10).
 -define(ENV, [
-    {http_port,       ?HTTP_PORT},
+    {listen_port,     ?LISTEN_PORT},
     {request_timeout, ?REQUEST_TIMEOUT}
 ]).
 -define(QUERY,  <<"<sirena><query></query></sirena>">>).
@@ -119,13 +119,13 @@ test_200_with_headers(Mock) ->
 
 
 get(Path, Headers) ->
-    Req = {lists:concat(["http://localhost:", ?HTTP_PORT, Path]), Headers},
+    Req = {lists:concat(["http://localhost:", ?LISTEN_PORT, Path]), Headers},
     httpc:request(get, Req, [], []).
 
 
 post(Path, Headers, Body) ->
     Req = {
-        lists:concat(["http://localhost:", ?HTTP_PORT, Path]),
+        lists:concat(["http://localhost:", ?LISTEN_PORT, Path]),
         Headers,
         "application/xml",
         Body
