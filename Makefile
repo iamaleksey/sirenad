@@ -1,4 +1,4 @@
-.PHONY: all deps compile clean console rel relclean clobber test analyze buildplt xref
+.PHONY: all deps compile clean console rel relclean clobber test dialyze buildplt xref
 
 all: deps compile
 
@@ -26,8 +26,8 @@ clobber: clean relclean
 test:
 	@./rebar skip_deps=true eunit
 
-analyze:
-	@./rebar skip_deps=true analyze
+dialyze:
+	@./rebar skip_deps=true dialyze
 
 buildplt:
 	@./rebar skip_deps=true build_plt
