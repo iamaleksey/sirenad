@@ -1,16 +1,27 @@
-all: compile
+.PHONY: all deps compile clean console rel relclean clobber test analyze buildplt xref
+
+all: deps compile
+
+deps:
+	@./rebar get-deps
 
 compile:
-	@./rebar skip_deps=true compile
-
-compileall:
 	@./rebar compile
 
 clean:
-	@./rebar skip_deps=true clean
+	@./rebar clean
 
 console:
 	@rel/sirenad/bin/sirenad console
+
+rel: deps compile relclean
+	@cd rel; ../rebar generate
+
+relclean:
+	@rm -rf rel/sirenad
+
+clobber: clean relclean
+	@rm deps -rf
 
 test:
 	@./rebar skip_deps=true eunit
@@ -18,30 +29,8 @@ test:
 analyze:
 	@./rebar skip_deps=true analyze
 
-checkplt:
-	@./rebar skip_deps=true check_plt
-
 buildplt:
 	@./rebar skip_deps=true build_plt
 
 xref:
 	@./rebar skip_deps=true xref
-
-rel: checkdeps compileall
-	@cd rel; ../rebar generate
-
-relclean:
-	@rm -rf rel/sirenad
-
-clobber: relclean clean
-
-checkdeps:
-	@./rebar skip_deps=true check-deps
-
-getdeps:
-	@./rebar skip_deps=true get-deps
-
-deldeps:
-	@./rebar skip_deps=true delete-deps
-
-.PHONY: all compile compileall clean console test analyze checkplt buildplt xref rel relclean checkdeps getdeps deldeps
